@@ -1,70 +1,113 @@
-JP Morgan Quantitative Research
+\# 🧮 JP Morgan Quantitative Research – Task 2  
+## Price a Commodity Storage Contract  
 
-Task 2 – Price a Commodity Storage Contract
+This repository contains my solution for **Task 2** of the **J.P. Morgan Quantitative Research Virtual Job Experience** on Forage.  
+The objective is to develop a **valuation tool** that prices a **physical commodity storage contract** based on forecasted commodity prices.  
 
-This repository contains files for Task 2 of the J.P. Morgan Quantitative Research Virtual Job Experience. The goal is to use the price forecasting model from Task 1 to build a valuation tool for a physical commodity storage contract.
+This exercise demonstrates quantitative modeling, event-driven simulation, and financial engineering techniques commonly used in **energy markets** and **commodities trading**.
 
-📊 Problem Statement
+---
 
-A client wants to execute a seasonal arbitrage strategy (buy low in summer, sell high in winter). We were tasked with building a model to calculate the Net Present Value (NPV) of their proposed trading schedule.
+## 📘 Abstract  
 
-The model needed to:
+Commodity storage contracts are widely used by energy traders to capture **seasonal price spreads** — buying natural gas when prices are low (summer) and selling it when prices are high (winter).  
 
-Take all contract parameters as inputs (injection/withdrawal dates, volumes, rates, and costs).
+This project builds a **simulation-based valuation model** that calculates the **Net Present Value (NPV)** of a storage strategy while respecting real-world operational and physical constraints such as:  
+- Injection and withdrawal rate limits  
+- Maximum storage capacity  
+- Daily/monthly storage and transaction costs  
 
-Calculate all associated cash flows (purchases, sales, storage costs, transaction fees).
+The result is a **transparent event-driven simulation** that produces both the **final valuation** and a **detailed transaction log**, allowing traders and analysts to audit every cash flow.
 
-Respect physical constraints like maximum storage capacity and available inventory.
+---
 
-Return the final net profit or loss of the contract.
+## 📊 Problem Statement  
 
-🛠️ Approach
+The client’s goal is to execute a **seasonal arbitrage strategy** using natural gas storage.  
+We must determine whether the proposed trading schedule is profitable, and by how much.  
 
-The solution is an Event-Driven Simulation, which processes all contract events in chronological order to accurately model cash flows and inventory.
+The model must:
+1. Take all **contract parameters** as inputs (dates, volumes, costs).  
+2. Calculate **cash flows** associated with purchases, sales, and costs.  
+3. Enforce **capacity and rate constraints**.  
+4. Output the **Net Present Value (NPV)** and **detailed event log**.
 
-Steps:
+---
 
-Create a Timeline: All injection and withdrawal dates are combined and sorted chronologically to create a master event schedule.
+## 🧠 Quantitative Framework  
 
-Initialize State: The simulation starts with key variables at zero (e.g., current_stored_volume, total_cash_flow).
+### 1. Cash Flow Definition  
 
-Iterate Through Events: The model loops through the timeline, processing each event one by one.
+For any time step *t*, the incremental cash flow is:
+\[
+CF_t = Q_t (P_t^{sell} - P_t^{buy}) - C_{storage,t} - C_{trans,t} - C_{oper,t}
+\]
 
-Apply Business Logic: For each event, the model:
+Where:
+- \( Q_t \): quantity injected or withdrawn at time *t*  
+- \( P_t^{buy}, P_t^{sell} \): forecasted buy/sell price at time *t*  
+- \( C_{storage,t} \): storage cost for inventory  
+- \( C_{trans,t}, C_{oper,t} \): transport and operational costs  
 
-Calculates storage costs incurred since the last event.
+The **Net Present Value (NPV)** is the discounted sum:
+\[
+NPV = \sum_{t=1}^{T} \frac{CF_t}{(1+r)^{t/365}}
+\]
+where \( r \) is the annual discount rate (can be set to 0 for simplicity).
 
-Checks physical constraints (Is there space to inject? Is there gas to withdraw?).
+### 2. Arbitrage Intuition  
 
-Calculates the cash flow for the purchase or sale using the forecasted price for that day.
+If the forward curve exhibits a **seasonal spread**, such that:
+\[
+\Delta P = P_{winter} - P_{summer} > 0
+\]
+then storing volume \( Q \) yields an arbitrage gain:
+\[
+Profit = Q (\Delta P - C_{storage} - C_{trans})
+\]
 
-Updates the current_stored_volume and total_cash_flow.
+The simulation quantifies this gain dynamically, handling non-linear constraints and real-world costs.
 
-Return Final Value: After all events are processed, the final total_cash_flow is returned as the contract's value.
+---
 
-📈 Results
+## 🧮 Model Design  
 
-The model successfully calculates the NPV of a given trading strategy by simulating all associated cash flows.
+### Simulation Architecture  
 
-It correctly enforces real-world physical constraints, preventing unrealistic scenarios like selling non-existent gas.
+1. **Input Layer**
+   - Takes forecasted price data (`price_data`) and schedule inputs.  
+   - Validates all date mappings and price availability.
 
-A key output is a detailed transaction log in a pandas DataFrame, which makes the final valuation transparent and easy for a trader to audit.
+2. **Event Processing Layer**
+   - Iterates through all injection and withdrawal events chronologically.  
+   - For each event, it:
+     - Reads the price on that date  
+     - Computes transaction cost or revenue  
+     - Applies storage cost since last event  
+     - Updates cumulative `cash_flow` and `inventory`
 
-Example Usage
+3. **Output Layer**
+   - Returns final `cash_flow` and a detailed pandas `DataFrame` log of all events.  
+   - Each log entry includes date, price, action type, volume, and resulting balance.
 
-The main function price_commodity_storage_contract is called with the strategy parameters. It returns the final value and the detailed log.
+---
 
-# Example of how the pricing function is called
-final_value, transaction_log = price_commodity_storage_contract(
-    injection_dates=injection_days_list,
-    withdrawal_dates=withdrawal_days_list,
-    injection_volume_per_day=35000,
-    withdrawal_volume_per_day=35000,
-    max_storage_volume=1000000,
-    storage_cost_per_mmbtu_per_day=0.001,
-    injection_withdrawal_cost_per_mmbtu=0.01,
-    price_estimator_func=price_estimator
+## 🧰 Function Description  
+
+### `price_storage_contract()`
+
+```python
+def price_storage_contract(
+    injection_dates,
+    withdrawal_dates,
+    price_data,
+    injection_rate,
+    withdrawal_rate,
+    max_storage,
+    storage_cost_per_month,
+    injection_cost,
+    withdrawal_cost,
+    transport_cost
 )
 
-print(f"Final Contract Value: ${final_value:,.2f}")
-display(transaction_log)
+
